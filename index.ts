@@ -16,9 +16,15 @@ import { z } from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
 import { getVersion } from "./helpers/package.js" with { type: "macro" };
 
+// Helper function for consistent JSON stringification
+function formatJSON(data: unknown, compact = false): string {
+  return JSON.stringify(data, null, compact ? 0 : 2);
+}
+
 const GraphQLSchema = z.object({
   query: z.string(),
   variables: z.string().optional(),
+  headers: z.record(z.string()).optional(),
 });
 
 const ConfigSchema = z.object({
@@ -101,7 +107,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   server.sendLoggingMessage({
     level: "debug",
-    message: `ReadResourceRequestSchema: ${JSON.stringify(request, null, 2)}`,
+    message: `ReadResourceRequestSchema: ${formatJSON(request)}`,
   });
 
   try {
@@ -111,9 +117,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         "Content-Type": "application/json",
         ...config.headers,
       },
-      body: JSON.stringify({
+      body: formatJSON({
         query: getIntrospectionQuery(),
-      }),
+      }, true),
     });
 
     if (!response.ok) {
@@ -127,7 +133,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri: request.params.uri,
           mimeType: "application/json",
-          text: JSON.stringify(schemaData, null, 2),
+          text: formatJSON(schemaData),
         },
       ],
     };
@@ -158,7 +164,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     throw new Error("Invalid tool name");
   }
 
-  const { query, variables } = GraphQLSchema.parse(request.params.arguments);
+  const { query, variables, headers } = GraphQLSchema.parse(request.params.arguments);
 
   server.sendLoggingMessage({
     level: "info",
@@ -184,13 +190,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const response = await fetch(config.endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        ...config.headers,
+        "content-type": "application/json",
+        ...headers,
       },
-      body: JSON.stringify({
+      body: formatJSON({
         query,
         variables,
-      }),
+      }, true),
     });
 
     if (!response.ok) {
@@ -206,11 +212,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text",
-            text: `The GraphQL response has errors, please fix the query: ${JSON.stringify(
-              data,
-              null,
-              2
-            )}`,
+            text: `The GraphQL response has errors, please fix the query: ${formatJSON(data)}, The headers provided to the fetch were: ${formatJSON(headers)}`,
           },
         ],
       };
@@ -220,7 +222,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: "text",
-          text: JSON.stringify(data, null, 2),
+          text: formatJSON(data),
         },
       ],
     };
