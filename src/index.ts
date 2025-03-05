@@ -200,7 +200,23 @@ server.tool(
 );
 
 /**
- * Connects the server to a transport
+ * Handles tool calling from the client and executes the tool
+ */
+// async function handleToolCall(name: string, body: string, variables: string) {
+// 	const tool = handler.getTool(name);
+// 	if (!tool) {
+// 		console.error(`Tool ${name} not found`);
+// 		return {
+// 			status: "error",
+// 			message: `Tool ${name} not found`,
+// 		};
+// 	}
+// 	const result = await handler.execute(tool, body, variables);
+// 	return result;
+// }
+
+/**
+ * Sets up the transport and starts the server with it
  */
 async function main() {
 	const transport = new StdioServerTransport();
