@@ -199,6 +199,15 @@ server.tool(
 	},
 );
 
+// Post-rebase artifact
+// const tools = Array.from(handler.tools.values()).map((tool) => ({
+// 	name: tool.name,
+// 	description: tool.description,
+// 	parameters: tool.parameters,
+// 	inputSchema: tool.inputSchema,
+// }));
+
+// Post-rebase artifact
 /**
  * Handles tool calling from the client and executes the tool
  */
