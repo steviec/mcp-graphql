@@ -5,7 +5,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { parse } from "graphql/language";
 import { z } from "zod";
 import { checkDeprecatedArguments } from "./helpers/deprecation.js";
-import { parseAndMergeHeaders } from "./helpers/headers.js";
 import {
 	introspectEndpoint,
 	introspectLocalSchema,
@@ -18,7 +17,10 @@ checkDeprecatedArguments();
 const EnvSchema = z.object({
 	NAME: z.string().default("mcp-graphql"),
 	ENDPOINT: z.string().url().default("http://localhost:4000/graphql"),
-	ALLOW_MUTATIONS: z.enum(['true', 'false']).transform((value) => value === 'true').default("false"),
+	ALLOW_MUTATIONS: z
+		.enum(["true", "false"])
+		.transform((value) => value === "true")
+		.default("false"),
 	HEADERS: z
 		.string()
 		.default("{}")
@@ -65,30 +67,14 @@ server.resource("graphql-schema", new URL(env.ENDPOINT).href, async (uri) => {
 server.tool(
 	"introspect-schema",
 	"Introspect the GraphQL schema, use this tool before doing a query to get the schema information if you do not have it available as a resource already.",
-	{
-		endpoint: z
-			.string()
-			.url()
-			.optional()
-			.describe(
-				`Optional: Override the default endpoint, the already used endpoint is: ${env.ENDPOINT}`,
-			),
-		headers: z
-			.union([z.record(z.string()), z.string()])
-			.optional()
-			.describe(
-				`Optional: Add additional headers, the already used headers are: ${JSON.stringify(env.HEADERS)}`,
-			),
-	},
-	async ({ endpoint, headers }) => {
+	{},
+	async () => {
 		try {
 			let schema: string;
 			if (env.SCHEMA) {
 				schema = await introspectLocalSchema(env.SCHEMA);
 			} else {
-				const useEndpoint = endpoint || env.ENDPOINT;
-				const useHeaders = parseAndMergeHeaders(env.HEADERS, headers);
-				schema = await introspectEndpoint(useEndpoint, useHeaders);
+				schema = await introspectEndpoint(env.ENDPOINT, env.HEADERS);
 			}
 
 			return {
@@ -111,21 +97,8 @@ server.tool(
 	{
 		query: z.string(),
 		variables: z.string().optional(),
-		endpoint: z
-			.string()
-			.url()
-			.optional()
-			.describe(
-				`Optional: Override the default endpoint, the already used endpoint is: ${env.ENDPOINT}`,
-			),
-		headers: z
-			.union([z.record(z.string()), z.string()])
-			.optional()
-			.describe(
-				`Optional: Add additional headers, the already used headers are: ${JSON.stringify(env.HEADERS)}`,
-			),
 	},
-	async ({ query, variables, endpoint, headers }) => {
+	async ({ query, variables }) => {
 		try {
 			const parsedQuery = parse(query);
 
@@ -159,14 +132,11 @@ server.tool(
 		}
 
 		try {
-			const useEndpoint = endpoint || env.ENDPOINT;
-			const useHeaders = parseAndMergeHeaders(env.HEADERS, headers);
-
-			const response = await fetch(useEndpoint, {
+			const response = await fetch(env.ENDPOINT, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					...useHeaders,
+					...env.HEADERS,
 				},
 				body: JSON.stringify({
 					query,
