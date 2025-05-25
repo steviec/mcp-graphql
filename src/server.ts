@@ -4,7 +4,9 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import zodToJsonSchema from "zod-to-json-schema";
 import { getVersion } from "./helpers/package.js" with { type: "macro" };
+import { createGraphQLHandler } from "./lib/graphql";
 
 const EnvSchema = z.object({
 	NAME: z.string().default("mcp-graphql"),
@@ -43,6 +45,40 @@ const server = new Server(
 	},
 );
 
+const handler = await createGraphQLHandler({
+	endpoint: env.ENDPOINT,
+	headers: env.HEADERS,
+	allowMutations: env.ALLOW_MUTATIONS,
+	excludeQueries: [],
+	excludeMutations: [],
+	name: env.NAME,
+});
+
+// Post-rebase artifact
+const tools = Array.from(handler.tools.values()).map((tool) => ({
+	name: tool.name,
+	description: tool.description,
+	parameters: tool.parameters,
+	inputSchema: tool.inputSchema,
+}));
+
+// Post-rebase artifact
+/**
+ * Handles tool calling from the client and executes the tool
+ */
+// async function handleToolCall(name: string, body: string, variables: string) {
+// 	const tool = handler.getTool(name);
+// 	if (!tool) {
+// 		console.error(`Tool ${name} not found`);
+// 		return {
+// 			status: "error",
+// 			message: `Tool ${name} not found`,
+// 		};
+// 	}
+// 	const result = await handler.execute(tool, body, variables);
+// 	return result;
+// }
+
 server.setRequestHandler(ListToolsRequestSchema, async (request) => {
 	return {
 		tools: [
@@ -50,6 +86,7 @@ server.setRequestHandler(ListToolsRequestSchema, async (request) => {
 				name: "introspect_schema",
 				description:
 					"Introspect the GraphQL schema, use this tool before doing a query to get the schema information if you do not have it available as a resource already.",
+				inputSchema: zodToJsonSchema(z.object({})),
 			},
 			{
 				// TODO: Check whether we should rename this to operation
@@ -60,7 +97,14 @@ server.setRequestHandler(ListToolsRequestSchema, async (request) => {
 					query: z.string(),
 					variables: z.string().optional(),
 				}),
+				inputSchema: zodToJsonSchema(
+					z.object({
+						query: z.string(),
+						variables: z.string().optional(),
+					}),
+				),
 			},
+			...tools,
 		],
 	};
 });
